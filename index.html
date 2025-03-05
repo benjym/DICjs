@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Image Correlation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-GQE06JN33T"></script>
+    <link rel="stylesheet" href="main.css"></link>
+    <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19.1/dist/lil-gui.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/opencv.js-webassembly@4.2.0/opencv.min.js" onload="onOpenCvReady()"></script>
+</head>
+<body>
+    <h1>Digital Image Correlation</h1>
+
+    <div id="container">
+        <div class="canvas-container">
+            <canvas id="canvas-source" width="640" height="480"></canvas>
+            <div class="canvas-label">Source Frame</div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="canvas-output" width="640" height="480"></canvas>
+            <div class="canvas-label">Live Video</div>
+        </div>
+    </div>
+
+     <div id="buttons-container">
+        <button id="downloadButton" style="display: none;">Download Displacements</button>
+    </div>
+    <video id="video" style="display: none;" width="640" height="480"></video>
+
+    <div id="instructions">
+        <h2>Instructions</h2>
+        <p>This interactive demonstration shows Digital Image Correlation (DIC) in action, using your webcam. DIC estimates the motion of pixels between consecutive frames of a video.</p>
+        <ol>
+            <li><strong>Camera Access:</strong> Grant camera access when prompted.</li>
+            <li><strong>Live Video:</strong> The right canvas shows the live feed.</li>
+            <li><strong>Capture Frame:</strong> Click the "Capture Frame" button in the GUI to capture a still frame (left canvas).</li>
+            <li><strong>Observe Motion:</strong> Red lines on the right canvas show pixel movement.</li>
+            <li><strong>Adjust Parameters:</strong>
+                <ul>
+                    <li><strong>Flow Density:</strong> Controls how many flow vectors are *displayed* (higher = more lines).  This does *not* affect the optical flow calculation itself, only the visualization.</li>
+                    <li><strong>Window Size:</strong> Adjusts the neighbourhood size for correlation calculation.</li>
+                    <li><strong>Incremental:</strong> If enabled, compares incremental steps in the video acquisition. If disabled, compares displacements against the static image on the left.</li>
+                </ul>
+            </li>
+            <li><strong>Download Data:</strong> Click "Download Displacements" to get an Excel file with the raw displacement values.</li>
+        </ol>
+    </div>
+    <div id="scigem_tag">
+        Built with <a href="https://threejs.org/">opencv</a> by <a href="http://benjymarks.com/">Benjy Marks</a>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
