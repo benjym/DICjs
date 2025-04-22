@@ -41,11 +41,11 @@
             <li><strong>Camera Access:</strong> Grant camera access when prompted.</li>
             <li><strong>Live Video:</strong> The right canvas shows the live feed.</li>
             <li><strong>Capture Frame:</strong> Click the "Capture Frame" button in the GUI to capture a still frame (left canvas).</li>
-            <li><strong>Observe Motion:</strong> Red lines on the right canvas show pixel movement.</li>
+            <li><strong>Observe Motion:</strong> White lines on the right canvas show pixel movement.</li>
             <li><strong>Adjust Parameters:</strong>
                 <ul>
-                    <li><strong>Flow Density:</strong> Controls how many flow vectors are *displayed* (higher = more lines).  This does *not* affect the optical flow calculation itself, only the visualization.</li>
-                    <li><strong>Window Size:</strong> Adjusts the neighbourhood size for correlation calculation.</li>
+                    <li><strong>Flow Density:</strong> Controls how many flow vectors are <strong>displayed</strong> (higher = more lines).  This does not affect the optical flow calculation itself, only the visualization.</li>
+                    <li><strong>Window Size:</strong> Adjusts the neighbourhood size for correlation calculation. Smaller is noisier but picks up finer features. Larger is smoother and more spread out.</li>
                     <li><strong>Incremental:</strong> If enabled, compares incremental steps in the video acquisition. If disabled, compares displacements against the static image on the left.</li>
                 </ul>
             </li>
