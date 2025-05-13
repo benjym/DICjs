@@ -125,7 +125,6 @@ function startCamera() {
                 canvasOutput.height = height;
 
                 // Reinitialize Mats with correct dimensions
-                if (cap) cap.delete();
                 if (frame) frame.delete();
                 if (gray) gray.delete();
                 if (flow) flow.delete();
