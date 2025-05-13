@@ -66,6 +66,7 @@ function getCameras() {
             navigator.mediaDevices.enumerateDevices()
                 .then(devices => {
                     videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    console.log("Video devices:", videoDevices);
 
                     if (videoDevices.length > 1) {
                         const cameraOptions = {};
@@ -170,9 +171,13 @@ function processVideo() {
     let begin = Date.now();
 
     try {
-        console.log(cap)
-        console.log("Frame size: ", frame.size());
-        cap.read(frame); // Read the frame  
+        // console.log("cap state:", cap);
+        // console.log("frame before read: size=", frame.size());
+
+        // Attempt to read the frame
+        cap.read(frame);
+
+        // console.log("frame after read: size=", frame.size());
 
         // Convert the current frame to grayscale.
         cv.cvtColor(frame, gray, cv.COLOR_RGBA2GRAY);
