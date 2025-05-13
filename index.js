@@ -33,7 +33,7 @@ const controls = {
 
             // Important: Delete the *old* prevGray before replacing it.
             if (prevGray) prevGray.delete();
-            prevGray = gray; // No .clone() needed here - we *want* this frame
+            prevGray = gray;
 
             downloadButton.style.display = 'inline-block';
             src.delete();
@@ -60,26 +60,37 @@ function onOpenCvReady() {
 }
 
 function getCameras() {
-    navigator.mediaDevices.enumerateDevices()
-        .then(devices => {
-            videoDevices = devices.filter(device => device.kind === 'videoinput');
+    // Request camera access to ensure permissions are granted
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then(() => {
+            navigator.mediaDevices.enumerateDevices()
+                .then(devices => {
+                    videoDevices = devices.filter(device => device.kind === 'videoinput');
 
-            if (videoDevices.length > 1) {
-                const cameraOptions = {};
-                videoDevices.forEach((device, index) => {
-                    cameraOptions[`Camera ${index + 1}`] = index;
+                    if (videoDevices.length > 1) {
+                        const cameraOptions = {};
+                        videoDevices.forEach((device, index) => {
+                            cameraOptions[`Camera ${index + 1}`] = index;
+                        });
+
+                        gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
+                            .name('Camera')
+                            .onChange(value => {
+                                currentCameraIndex = value;
+                                startCamera();
+                            });
+                    }
+
+                    // Start the camera after devices are enumerated
+                    startCamera();
+                })
+                .catch(err => {
+                    console.error('Error enumerating devices:', err);
                 });
-
-                gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
-                    .name('Camera')
-                    .onChange(value => {
-                        currentCameraIndex = value;
-                        startCamera();
-                    });
-            }
         })
         .catch(err => {
-            console.error('Error enumerating devices:', err);
+            console.error('Error accessing camera:', err);
+            alert('Camera permissions are required to proceed.');
         });
 }
 
@@ -102,20 +113,27 @@ function startCamera() {
             video.srcObject = stream;
             video.play();
             video.onloadedmetadata = () => {
+                // Use videoWidth and videoHeight for consistent dimensions
                 width = video.videoWidth;
                 height = video.videoHeight;
                 console.log("video width: ", width, "video height: ", height);
 
+                // Reinitialize canvas dimensions
                 canvasSource.width = width;
                 canvasSource.height = height;
                 canvasOutput.width = width;
                 canvasOutput.height = height;
 
-                // Initialize Mats *after* getting dimensions.
+                // Reinitialize Mats with correct dimensions
+                if (cap) cap.delete();
+                if (frame) frame.delete();
+                if (gray) gray.delete();
+                if (flow) flow.delete();
+
                 cap = new cv.VideoCapture(video);
                 frame = new cv.Mat(height, width, cv.CV_8UC4);
-                gray = new cv.Mat(height, width, cv.CV_8UC1); // Correct type
-                flow = new cv.Mat(); // Initialize flow
+                gray = new cv.Mat(height, width, cv.CV_8UC1);
+                flow = new cv.Mat();
 
                 streaming = true;
                 setTimeout(processVideo, 0); // Start processing
@@ -153,12 +171,9 @@ function processVideo() {
     let begin = Date.now();
 
     try {
-        cap.read(frame); // Read the frame
-        if (frame.empty()) {
-            console.error("Frame is empty!");
-            setTimeout(processVideo, 0);
-            return;
-        }
+        console.log(cap)
+        console.log("Frame size: ", frame.size());
+        cap.read(frame); // Read the frame  
 
         // Convert the current frame to grayscale.
         cv.cvtColor(frame, gray, cv.COLOR_RGBA2GRAY);
@@ -209,16 +224,16 @@ function processVideo() {
           ctxOutput.drawImage(video, 0, 0, width, height);
         }
 
-        // *** IMPORTANT: prevGray = gray.clone() *AFTER* processing ***
         if (controls.incremental) {
-            if (prevGray) {
-                prevGray.delete(); // Release old prevGray
-            }
             prevGray = gray.clone(); // Clone current gray to prevGray
         }
 
     } catch (err) {
         console.error("Error in processVideo:", err);
+
+        // JUST FOR DEBUGGING
+        stopProcessing(); // Stop the loop on error
+        return; // Exit the function to prevent further execution
     }
 
     let delay = Math.max(0, 1000 / 30 - (Date.now() - begin));
@@ -227,11 +242,6 @@ function processVideo() {
 function stopProcessing() {
     if (streaming) {
         streaming = false;
-        if (prevGray) prevGray.delete();
-        if (frame) frame.delete();
-        if (gray) gray.delete();
-        if (flow) flow.delete();
-        if (cap) cap.delete();
     }
 }
 
