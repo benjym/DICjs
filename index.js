@@ -114,9 +114,24 @@ function startCamera() {
             video.srcObject = stream;
             video.play();
             video.onloadedmetadata = () => {
+                // Dynamically set the initial size of the video element
+                video.width = video.videoWidth;
+                video.height = video.videoHeight;
+
                 // Use videoWidth and videoHeight for consistent dimensions
                 width = video.videoWidth;
                 height = video.videoHeight;
+
+                // Check if width < height and flip them internally
+                if (width < height) {
+                    [width, height] = [height, width];
+                }
+
+                // Dynamically set the aspect ratio of the video element
+                video.style.aspectRatio = `${width} / ${height}`;
+
+                
+
                 console.log("video width: ", width, "video height: ", height);
 
                 // Reinitialize canvas dimensions
@@ -171,8 +186,8 @@ function processVideo() {
     let begin = Date.now();
 
     try {
-        // console.log("cap state:", cap);
-        // console.log("frame before read: size=", frame.size());
+        console.log("cap state:", cap);
+        console.log("frame before read: size=", frame.size());
 
         // Attempt to read the frame
         cap.read(frame);

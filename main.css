@@ -44,7 +44,11 @@ a {
 }
 
 canvas {
-    display: block; /* Remove extra space below canvas */
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    aspect-ratio: 16 / 9; /* Enforce 16:9 aspect ratio */
 }
 
 .canvas-label {
@@ -126,4 +130,18 @@ button:hover {
     padding: 5px;
     border-radius: 4px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+video {
+    max-width: 100%;
+    height: auto; /* Maintain aspect ratio */
+    display: block;
+    margin: 0 auto;
+    aspect-ratio: 16 / 9; /* Enforce 16:9 aspect ratio */
+}
+
+@media (max-width: 600px) {
+    video, canvas {
+        width: 100%;
+    }
 }
