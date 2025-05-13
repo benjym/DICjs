@@ -11,6 +11,9 @@ let width, height;
 let flowData = null;
 let cvLoaded = false;
 
+let currentCameraIndex = 0;
+let videoDevices = [];
+
 // --- GUI Controls ---
 const gui = new lil.GUI();
 const controls = {
@@ -56,9 +59,45 @@ function onOpenCvReady() {
     };
 }
 
+function getCameras() {
+    navigator.mediaDevices.enumerateDevices()
+        .then(devices => {
+            videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+            if (videoDevices.length > 1) {
+                const cameraOptions = {};
+                videoDevices.forEach((device, index) => {
+                    cameraOptions[`Camera ${index + 1}`] = index;
+                });
+
+                gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
+                    .name('Camera')
+                    .onChange(value => {
+                        currentCameraIndex = value;
+                        startCamera();
+                    });
+            }
+        })
+        .catch(err => {
+            console.error('Error enumerating devices:', err);
+        });
+}
+
 function startCamera() {
     if (!cvLoaded) return;
-    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+
+    if (streaming) {
+        stopProcessing();
+    }
+
+    const constraints = {
+        video: {
+            deviceId: videoDevices[currentCameraIndex]?.deviceId || undefined
+        },
+        audio: false
+    };
+
+    navigator.mediaDevices.getUserMedia(constraints)
         .then(stream => {
             video.srcObject = stream;
             video.play();
@@ -195,3 +234,6 @@ function stopProcessing() {
         if (cap) cap.delete();
     }
 }
+
+// Call getCameras on page load to populate the dropdown
+getCameras();
