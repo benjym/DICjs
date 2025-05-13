@@ -132,7 +132,7 @@ function startCamera() {
 
                 
 
-                console.log("video width: ", width, "video height: ", height);
+                // console.log("video width: ", width, "video height: ", height);
 
                 // Reinitialize canvas dimensions
                 canvasSource.width = width;
@@ -186,8 +186,8 @@ function processVideo() {
     let begin = Date.now();
 
     try {
-        console.log("cap state:", cap);
-        console.log("frame before read: size=", frame.size());
+        // console.log("cap state:", cap);
+        // console.log("frame before read: size=", frame.size());
 
         // Attempt to read the frame
         cap.read(frame);
