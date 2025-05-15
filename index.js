@@ -123,9 +123,9 @@ function startCamera() {
                 height = video.videoHeight;
 
                 // Check if width < height and flip them internally
-                if (width < height) {
-                    [width, height] = [height, width];
-                }
+                // if (width < height) {
+                //     [width, height] = [height, width];
+                // }
 
                 // Dynamically set the aspect ratio of the video element
                 video.style.aspectRatio = `${width} / ${height}`;
