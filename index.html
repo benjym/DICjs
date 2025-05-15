@@ -20,12 +20,12 @@
 
     <div id="container">
         <div class="canvas-container">
-            <canvas id="canvas-source"></canvas>
-            <div class="canvas-label">Source Frame</div>
-        </div>
-        <div class="canvas-container">
             <canvas id="canvas-output"></canvas>
             <div class="canvas-label">Live Video</div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="canvas-source"></canvas>
+            <div class="canvas-label">Source Frame</div>
         </div>
     </div>
 
@@ -39,9 +39,9 @@
         <p>This interactive demonstration shows Digital Image Correlation (DIC) in action, using your webcam. DIC estimates the motion of pixels between consecutive frames of a video.</p>
         <ol>
             <li><strong>Camera Access:</strong> Grant camera access when prompted.</li>
-            <li><strong>Live Video:</strong> The right canvas shows the live feed.</li>
-            <li><strong>Capture Frame:</strong> Click the "Capture Frame" button in the GUI to capture a still frame (left canvas).</li>
-            <li><strong>Observe Motion:</strong> White lines on the right canvas show pixel movement.</li>
+            <li><strong>Live Video:</strong> The left/top canvas shows the live feed.</li>
+            <li><strong>Capture Frame:</strong> Click the "Capture Frame" button in the GUI to capture a still frame (right/bottom canvas).</li>
+            <li><strong>Observe Motion:</strong> White lines on the left canvas show pixel movement.</li>
             <li><strong>Adjust Parameters:</strong>
                 <ul>
                     <li><strong>Flow Density:</strong> Controls how many flow vectors are <strong>displayed</strong> (higher = more lines).  This does not affect the optical flow calculation itself, only the visualization.</li>
