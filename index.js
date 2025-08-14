@@ -20,6 +20,7 @@ const controls = {
     flowStep: 16,
     winSize: 15,
     incremental: false,
+    resolution: 'Auto (Max)',
     captureFrame: () => {
         if (streaming && cvLoaded) {
             ctxSource.drawImage(video, 0, 0, width, height);
@@ -40,9 +41,21 @@ const controls = {
         }
     }
 };
+
+// Resolution presets
+const resolutionPresets = {
+    'Auto (Max)': { width: 4096, height: 2160 },
+    '4K (3840×2160)': { width: 3840, height: 2160 },
+    '1440p (2560×1440)': { width: 2560, height: 1440 },
+    '1080p (1920×1080)': { width: 1920, height: 1080 },
+    '720p (1280×720)': { width: 1280, height: 720 },
+    '480p (640×480)': { width: 640, height: 480 }
+};
+
 gui.add(controls, 'flowStep', 2, 64, 1).name('Flow Density');
 gui.add(controls, 'winSize', 3, 31, 2).name('Window Size');
 gui.add(controls, 'incremental').name('Incremental');
+// Resolution dropdown will be added after camera capabilities are known
 gui.add(controls, 'captureFrame').name('Capture Frame');
 
 // --- OpenCV and Video Setup ---
@@ -55,39 +68,101 @@ function onOpenCvReady() {
     cv['onRuntimeInitialized'] = () => {
         cvLoaded = true;
         console.log("OpenCV.js is ready.");
-        startCamera();
+        // Only start camera if devices are already enumerated
+        if (videoDevices.length > 0) {
+            startCamera();
+        }
     };
 }
 
+let cameraCapabilities = null;
+let initialStream = null;
+
 function getCameras() {
-    // Request camera access to ensure permissions are granted
-    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-        .then(() => {
-            navigator.mediaDevices.enumerateDevices()
-                .then(devices => {
-                    videoDevices = devices.filter(device => device.kind === 'videoinput');
-                    console.log("Video devices:", videoDevices);
+    // Get selected resolution for initial request
+    const selectedResolution = resolutionPresets[controls.resolution];
+    let targetWidth, targetHeight;
+    
+    if (controls.resolution === 'Auto (Max)') {
+        targetWidth = 4096;
+        targetHeight = 2160;
+    } else {
+        targetWidth = selectedResolution.width;
+        targetHeight = selectedResolution.height;
+    }
 
-                    if (videoDevices.length > 1) {
-                        const cameraOptions = {};
-                        videoDevices.forEach((device, index) => {
-                            cameraOptions[`Camera ${index + 1}`] = index;
-                        });
+    // Request camera access with selected resolution
+    const constraints = {
+        video: {
+            width: { ideal: targetWidth },
+            height: { ideal: targetHeight },
+            frameRate: { ideal: 30 }
+        },
+        audio: false
+    };
 
-                        gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
-                            .name('Camera')
-                            .onChange(value => {
-                                currentCameraIndex = value;
-                                startCamera();
-                            });
-                    }
+    navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+            initialStream = stream;
+            // Get the video track to check capabilities and enumerate devices
+            const videoTrack = stream.getVideoTracks()[0];
+            cameraCapabilities = videoTrack.getCapabilities();
+            
+            console.log("Camera capabilities:", cameraCapabilities);
+            console.log("Initial stream resolution:", videoTrack.getSettings());
+            
+            // Now enumerate devices
+            return navigator.mediaDevices.enumerateDevices();
+        })
+        .then(devices => {
+            videoDevices = devices.filter(device => device.kind === 'videoinput');
+            console.log("Video devices:", videoDevices);
 
-                    // Start the camera after devices are enumerated
-                    startCamera();
-                })
-                .catch(err => {
-                    console.error('Error enumerating devices:', err);
-                });
+            // Filter resolution presets based on camera capabilities
+            const availableResolutions = {};
+            const maxWidth = cameraCapabilities?.width?.max || 4096;
+            const maxHeight = cameraCapabilities?.height?.max || 2160;
+            
+            console.log("Camera max resolution:", maxWidth, "x", maxHeight);
+            
+            // Always include Auto (Max)
+            availableResolutions['Auto (Max)'] = resolutionPresets['Auto (Max)'];
+            
+            // Filter other resolutions that are within camera capabilities
+            Object.entries(resolutionPresets).forEach(([name, res]) => {
+                if (name !== 'Auto (Max)' && res.width <= maxWidth && res.height <= maxHeight) {
+                    availableResolutions[name] = res;
+                }
+            });
+            
+            console.log("Available resolutions:", Object.keys(availableResolutions));
+            
+            // // Add resolution dropdown with filtered options
+            // gui.add(controls, 'resolution', Object.keys(availableResolutions))
+            //     .name('Resolution')
+            //     .onChange(value => {
+            //         console.log('Resolution changed to:', value);
+            //         changeResolution(value);
+            //     });
+
+            // if (videoDevices.length > 1) {
+            //     const cameraOptions = {};
+            //     videoDevices.forEach((device, index) => {
+            //         cameraOptions[`Camera ${index + 1}`] = index;
+            //     });
+
+            //     gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
+            //         .name('Camera')
+            //         .onChange(value => {
+            //             currentCameraIndex = value;
+            //             startCamera();
+            //         });
+            // }
+
+            // Only start camera after OpenCV is ready AND devices are enumerated
+            if (cvLoaded) {
+                startCamera();
+            }
         })
         .catch(err => {
             console.error('Error accessing camera:', err);
@@ -95,32 +170,150 @@ function getCameras() {
         });
 }
 
-function startCamera() {
-    if (!cvLoaded) return;
+function changeResolution(resolutionName) {
+    if (!video.srcObject) {
+        console.log("No video stream to change resolution on");
+        return;
+    }
 
+    const selectedResolution = resolutionPresets[resolutionName];
+    let targetWidth, targetHeight;
+    
+    if (resolutionName === 'Auto (Max)') {
+        targetWidth = cameraCapabilities?.width?.max || 4096;
+        targetHeight = cameraCapabilities?.height?.max || 2160;
+    } else {
+        targetWidth = selectedResolution.width;
+        targetHeight = selectedResolution.height;
+    }
+
+    console.log("Changing resolution to:", targetWidth, "x", targetHeight);
+    
+    // Stop current processing
     if (streaming) {
         stopProcessing();
     }
-
+    
+    // Request new stream with exact resolution
     const constraints = {
         video: {
-            deviceId: videoDevices[currentCameraIndex]?.deviceId || undefined
+            deviceId: videoDevices[currentCameraIndex]?.deviceId || undefined,
+            width: { ideal: targetWidth },
+            height: { ideal: targetHeight },
+            frameRate: { ideal: 30 }
         },
         audio: false
     };
 
     navigator.mediaDevices.getUserMedia(constraints)
         .then(stream => {
+            // Stop the old stream
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            
+            // Set new stream
             video.srcObject = stream;
             video.play();
-            video.onloadedmetadata = () => {
+            
+            // Set up handlers for new stream
+            setupVideoHandlers();
+        })
+        .catch(err => {
+            console.error("Failed to change resolution:", err.message);
+            alert("Failed to change resolution: " + err.message);
+        });
+}
+
+function startCamera() {
+    if (!cvLoaded) return;
+
+    console.log("Starting camera, current streaming state:", streaming);
+
+    // Always stop processing first when switching cameras
+    if (streaming) {
+        console.log("Stopping current processing before camera switch");
+        stopProcessing();
+    }
+
+    // Clean up any existing video stream
+    if (video.srcObject && !initialStream) {
+        console.log("Cleaning up existing video stream");
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+
+    // Use initial stream if available, otherwise request new one (only for camera switching)
+    if (initialStream && currentCameraIndex === 0) {
+        console.log("Using initial high-resolution stream");
+        video.srcObject = initialStream;
+        video.play();
+        setupVideoHandlers();
+        initialStream = null; // Clear it so we don't reuse it
+    } else {
+        // Only request new stream when switching cameras (not for resolution changes)
+        console.log("Switching to camera", currentCameraIndex);
+        // Add a small delay to ensure processing has fully stopped
+        setTimeout(() => {
+            requestNewStreamForCamera();
+        }, 100);
+    }
+}
+
+function requestNewStreamForCamera() {
+    // Get current resolution setting
+    const selectedResolution = resolutionPresets[controls.resolution];
+    let targetWidth, targetHeight;
+    
+    if (controls.resolution === 'Auto (Max)') {
+        targetWidth = cameraCapabilities?.width?.max || 4096;
+        targetHeight = cameraCapabilities?.height?.max || 2160;
+    } else {
+        targetWidth = selectedResolution.width;
+        targetHeight = selectedResolution.height;
+    }
+    
+    const constraints = {
+        video: {
+            deviceId: videoDevices[currentCameraIndex]?.deviceId || undefined,
+            width: { ideal: targetWidth },
+            height: { ideal: targetHeight },
+            frameRate: { ideal: 30 }
+        },
+        audio: false
+    };
+    
+    console.log("Requesting new stream for camera with resolution:", targetWidth, "x", targetHeight);
+
+    navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+            // Stop the old stream
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            video.srcObject = stream;
+            video.play();
+            setupVideoHandlers();
+        })
+        .catch(err => {
+            console.error("Error accessing the camera:", err);
+            alert("Error accessing camera: " + err.message);
+        });
+}
+
+function setupVideoHandlers() {
+    video.onloadedmetadata = () => {
                 // Dynamically set the initial size of the video element
                 video.width = video.videoWidth;
                 video.height = video.videoHeight;
 
+                console.log(video.width, video.height)
+
                 // Use videoWidth and videoHeight for consistent dimensions
                 width = video.videoWidth;
                 height = video.videoHeight;
+
+                console.log("Camera resolution:", width, "x", height);
 
                 // Check if width < height and flip them internally
                 // if (width < height) {
@@ -150,14 +343,12 @@ function startCamera() {
                 gray = new cv.Mat(height, width, cv.CV_8UC1);
                 flow = new cv.Mat();
 
+                console.log("OpenCV Mats initialized with dimensions:", width, "x", height);
+                console.log("Frame Mat size:", frame.cols, "x", frame.rows);
+
                 streaming = true;
                 setTimeout(processVideo, 0); // Start processing
             };
-        })
-        .catch(err => {
-            console.error("Error accessing the camera:", err);
-            alert("Error accessing camera: " + err.message);
-        });
 }
 
 downloadButton.addEventListener('click', () => {
@@ -259,9 +450,16 @@ function processVideo() {
     setTimeout(processVideo, delay);
 }
 function stopProcessing() {
+    console.log("Stopping processing, current streaming state:", streaming);
     if (streaming) {
         streaming = false;
+        console.log("Processing stopped");
     }
+    
+    // Also clean up any pending timeouts by giving them a moment to check the streaming flag
+    setTimeout(() => {
+        console.log("Processing cleanup complete");
+    }, 50);
 }
 
 // Call getCameras on page load to populate the dropdown
