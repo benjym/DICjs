@@ -20,7 +20,8 @@ const controls = {
     flowStep: 16,
     winSize: 15,
     incremental: false,
-    resolution: 'Auto (Max)',
+    vectorScale: 1.0,
+    resolution: '480p (640×480)',
     captureFrame: () => {
         if (streaming && cvLoaded) {
             ctxSource.drawImage(video, 0, 0, width, height);
@@ -53,8 +54,9 @@ const resolutionPresets = {
 };
 
 gui.add(controls, 'flowStep', 2, 64, 1).name('Flow Density');
-gui.add(controls, 'winSize', 3, 31, 2).name('Window Size');
+gui.add(controls, 'winSize', 3, 256, 2).name('Window Size');
 gui.add(controls, 'incremental').name('Incremental');
+gui.add(controls, 'vectorScale', 0.1, 5.0, 0.1).name('Vector Scale');
 // Resolution dropdown will be added after camera capabilities are known
 gui.add(controls, 'captureFrame').name('Capture Frame');
 
@@ -82,7 +84,7 @@ function getCameras() {
     // Get selected resolution for initial request
     const selectedResolution = resolutionPresets[controls.resolution];
     let targetWidth, targetHeight;
-    
+
     if (controls.resolution === 'Auto (Max)') {
         targetWidth = 4096;
         targetHeight = 2160;
@@ -107,10 +109,10 @@ function getCameras() {
             // Get the video track to check capabilities and enumerate devices
             const videoTrack = stream.getVideoTracks()[0];
             cameraCapabilities = videoTrack.getCapabilities();
-            
+
             console.log("Camera capabilities:", cameraCapabilities);
             console.log("Initial stream resolution:", videoTrack.getSettings());
-            
+
             // Now enumerate devices
             return navigator.mediaDevices.enumerateDevices();
         })
@@ -122,28 +124,28 @@ function getCameras() {
             const availableResolutions = {};
             const maxWidth = cameraCapabilities?.width?.max || 4096;
             const maxHeight = cameraCapabilities?.height?.max || 2160;
-            
+
             console.log("Camera max resolution:", maxWidth, "x", maxHeight);
-            
+
             // Always include Auto (Max)
             availableResolutions['Auto (Max)'] = resolutionPresets['Auto (Max)'];
-            
+
             // Filter other resolutions that are within camera capabilities
             Object.entries(resolutionPresets).forEach(([name, res]) => {
                 if (name !== 'Auto (Max)' && res.width <= maxWidth && res.height <= maxHeight) {
                     availableResolutions[name] = res;
                 }
             });
-            
+
             console.log("Available resolutions:", Object.keys(availableResolutions));
-            
-            // // Add resolution dropdown with filtered options
-            // gui.add(controls, 'resolution', Object.keys(availableResolutions))
-            //     .name('Resolution')
-            //     .onChange(value => {
-            //         console.log('Resolution changed to:', value);
-            //         changeResolution(value);
-            //     });
+
+            // Add resolution dropdown with filtered options
+            gui.add(controls, 'resolution', Object.keys(availableResolutions))
+                .name('Resolution')
+                .onChange(value => {
+                    console.log('Resolution changed to:', value);
+                    changeResolution(value);
+                });
 
             // if (videoDevices.length > 1) {
             //     const cameraOptions = {};
@@ -178,7 +180,7 @@ function changeResolution(resolutionName) {
 
     const selectedResolution = resolutionPresets[resolutionName];
     let targetWidth, targetHeight;
-    
+
     if (resolutionName === 'Auto (Max)') {
         targetWidth = cameraCapabilities?.width?.max || 4096;
         targetHeight = cameraCapabilities?.height?.max || 2160;
@@ -188,12 +190,12 @@ function changeResolution(resolutionName) {
     }
 
     console.log("Changing resolution to:", targetWidth, "x", targetHeight);
-    
+
     // Stop current processing
     if (streaming) {
         stopProcessing();
     }
-    
+
     // Request new stream with exact resolution
     const constraints = {
         video: {
@@ -211,11 +213,11 @@ function changeResolution(resolutionName) {
             if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
-            
+
             // Set new stream
             video.srcObject = stream;
             video.play();
-            
+
             // Set up handlers for new stream
             setupVideoHandlers();
         })
@@ -264,7 +266,7 @@ function requestNewStreamForCamera() {
     // Get current resolution setting
     const selectedResolution = resolutionPresets[controls.resolution];
     let targetWidth, targetHeight;
-    
+
     if (controls.resolution === 'Auto (Max)') {
         targetWidth = cameraCapabilities?.width?.max || 4096;
         targetHeight = cameraCapabilities?.height?.max || 2160;
@@ -272,7 +274,7 @@ function requestNewStreamForCamera() {
         targetWidth = selectedResolution.width;
         targetHeight = selectedResolution.height;
     }
-    
+
     const constraints = {
         video: {
             deviceId: videoDevices[currentCameraIndex]?.deviceId || undefined,
@@ -282,7 +284,7 @@ function requestNewStreamForCamera() {
         },
         audio: false
     };
-    
+
     console.log("Requesting new stream for camera with resolution:", targetWidth, "x", targetHeight);
 
     navigator.mediaDevices.getUserMedia(constraints)
@@ -303,52 +305,52 @@ function requestNewStreamForCamera() {
 
 function setupVideoHandlers() {
     video.onloadedmetadata = () => {
-                // Dynamically set the initial size of the video element
-                video.width = video.videoWidth;
-                video.height = video.videoHeight;
+        // Dynamically set the initial size of the video element
+        video.width = video.videoWidth;
+        video.height = video.videoHeight;
 
-                console.log(video.width, video.height)
+        console.log(video.width, video.height)
 
-                // Use videoWidth and videoHeight for consistent dimensions
-                width = video.videoWidth;
-                height = video.videoHeight;
+        // Use videoWidth and videoHeight for consistent dimensions
+        width = video.videoWidth;
+        height = video.videoHeight;
 
-                console.log("Camera resolution:", width, "x", height);
+        console.log("Camera resolution:", width, "x", height);
 
-                // Check if width < height and flip them internally
-                // if (width < height) {
-                //     [width, height] = [height, width];
-                // }
+        // Check if width < height and flip them internally
+        // if (width < height) {
+        //     [width, height] = [height, width];
+        // }
 
-                // Dynamically set the aspect ratio of the video element
-                video.style.aspectRatio = `${width} / ${height}`;
+        // Dynamically set the aspect ratio of the video element
+        video.style.aspectRatio = `${width} / ${height}`;
 
-                
 
-                // console.log("video width: ", width, "video height: ", height);
 
-                // Reinitialize canvas dimensions
-                canvasSource.width = width;
-                canvasSource.height = height;
-                canvasOutput.width = width;
-                canvasOutput.height = height;
+        // console.log("video width: ", width, "video height: ", height);
 
-                // Reinitialize Mats with correct dimensions
-                if (frame) frame.delete();
-                if (gray) gray.delete();
-                if (flow) flow.delete();
+        // Reinitialize canvas dimensions
+        canvasSource.width = width;
+        canvasSource.height = height;
+        canvasOutput.width = width;
+        canvasOutput.height = height;
 
-                cap = new cv.VideoCapture(video);
-                frame = new cv.Mat(height, width, cv.CV_8UC4);
-                gray = new cv.Mat(height, width, cv.CV_8UC1);
-                flow = new cv.Mat();
+        // Reinitialize Mats with correct dimensions
+        if (frame) frame.delete();
+        if (gray) gray.delete();
+        if (flow) flow.delete();
 
-                console.log("OpenCV Mats initialized with dimensions:", width, "x", height);
-                console.log("Frame Mat size:", frame.cols, "x", frame.rows);
+        cap = new cv.VideoCapture(video);
+        frame = new cv.Mat(height, width, cv.CV_8UC4);
+        gray = new cv.Mat(height, width, cv.CV_8UC1);
+        flow = new cv.Mat();
 
-                streaming = true;
-                setTimeout(processVideo, 0); // Start processing
-            };
+        console.log("OpenCV Mats initialized with dimensions:", width, "x", height);
+        console.log("Frame Mat size:", frame.cols, "x", frame.rows);
+
+        streaming = true;
+        setTimeout(processVideo, 0); // Start processing
+    };
 }
 
 downloadButton.addEventListener('click', () => {
@@ -413,7 +415,8 @@ function processVideo() {
             // --- Visualization ---
             // Draw the *current* video frame onto the output canvas.
             ctxOutput.drawImage(video, 0, 0, width, height);
-            ctxOutput.strokeStyle = 'white';
+            // ctxOutput.strokeStyle = 'white';
+            ctxOutput.strokeStyle = 'black';
             ctxOutput.lineWidth = 2;
 
             // Draw the flow vectors.
@@ -422,16 +425,20 @@ function processVideo() {
                     let fx = flow.data32F[y * flow.cols * 2 + x * 2];
                     let fy = flow.data32F[y * flow.cols * 2 + x * 2 + 1];
 
+                    // Apply vector scaling
+                    let scaledFx = fx * controls.vectorScale;
+                    let scaledFy = fy * controls.vectorScale;
+
                     ctxOutput.beginPath();
                     ctxOutput.moveTo(x, y);
-                    ctxOutput.lineTo(x + fx, y + fy);
+                    ctxOutput.lineTo(x + scaledFx, y + scaledFy);
                     ctxOutput.stroke();
                 }
             }
 
         } else {
-          // If no prevGray, still draw the video
-          ctxOutput.drawImage(video, 0, 0, width, height);
+            // If no prevGray, still draw the video
+            ctxOutput.drawImage(video, 0, 0, width, height);
         }
 
         if (controls.incremental) {
@@ -455,7 +462,7 @@ function stopProcessing() {
         streaming = false;
         console.log("Processing stopped");
     }
-    
+
     // Also clean up any pending timeouts by giving them a moment to check the streaming flag
     setTimeout(() => {
         console.log("Processing cleanup complete");
