@@ -26,7 +26,7 @@ a {
 
 #container {
     display: flex;
-    justify-content: space-around;
+    justify-content: center;
     margin-bottom: 30px;
     flex-wrap: wrap; /* Allow wrapping on smaller screens */
     max-width: 1400px; /* Limit maximum width */

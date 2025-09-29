@@ -21,12 +21,10 @@
     <div id="container">
         <div class="canvas-container">
             <canvas id="canvas-output"></canvas>
-            <div class="canvas-label">Live Video</div>
+            <!-- <div class="canvas-label">Live Video</div> -->
         </div>
-        <div class="canvas-container">
-            <canvas id="canvas-source"></canvas>
-            <div class="canvas-label">Source Frame</div>
-        </div>
+        <!-- Source frame canvas - hidden -->
+        <canvas id="canvas-source" style="display: none;"></canvas>
     </div>
 
      <div id="buttons-container">
@@ -39,14 +37,14 @@
         <p>This interactive demonstration shows Digital Image Correlation (DIC) in action, using your webcam. DIC estimates the motion of pixels between consecutive frames of a video.</p>
         <ol>
             <li><strong>Camera Access:</strong> Grant camera access when prompted.</li>
-            <li><strong>Live Video:</strong> The left/top canvas shows the live feed.</li>
-            <li><strong>Capture Frame:</strong> Click the "Capture Frame" button in the GUI to capture a still frame (right/bottom canvas).</li>
-            <li><strong>Observe Motion:</strong> White lines on the left canvas show pixel movement.</li>
+            <li><strong>Live Video:</strong> The canvas shows the live feed from your camera.</li>
+            <li><strong>Capture Reference Frame:</strong> Click the "Capture Reference Frame" button in the GUI to capture a reference frame for comparison.</li>
+            <li><strong>Observe Motion:</strong> Coloured lines on the canvas show pixel movement relative to the captured frame.</li>
             <li><strong>Adjust Parameters:</strong>
                 <ul>
                     <li><strong>Flow Density:</strong> Controls how many flow vectors are <strong>displayed</strong> (higher = more lines).  This does not affect the optical flow calculation itself, only the visualization.</li>
                     <li><strong>Window Size:</strong> Adjusts the neighbourhood size for correlation calculation. Smaller is noisier but picks up finer features. Larger is smoother and more spread out.</li>
-                    <li><strong>Incremental:</strong> If enabled, compares incremental steps in the video acquisition. If disabled, compares displacements against the static image on the left.</li>
+                    <li><strong>Incremental:</strong> If enabled, compares incremental steps in the video acquisition. If disabled, compares displacements against the captured reference frame.</li>
                 </ul>
             </li>
             <li><strong>Download Data:</strong> Click "Download Displacements" to get an Excel file with the raw displacement values.</li>
