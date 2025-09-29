@@ -62,11 +62,11 @@ const resolutionPresets = {
 
 gui.add(controls, 'flowStep', 2, 64, 1).name('Flow Density');
 gui.add(controls, 'winSize', 3, 256, 2).name('Window Size');
-gui.add(controls, 'incremental').name('Incremental');
 gui.add(controls, 'vectorScale', 0.1, 5.0, 0.1).name('Vector Scale');
-gui.addColor(controls, 'arrowColour').name('Line Colour');
-// Resolution dropdown will be added after camera capabilities are known
+gui.addColor(controls, 'arrowColour').name('Vector Colour');
+gui.add(controls, 'incremental').name('Incremental');
 gui.add(controls, 'captureFrame').name('Capture Reference Frame');
+// Resolution dropdown will be added after camera capabilities are known
 
 // --- OpenCV and Video Setup ---
 let cap;
