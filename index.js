@@ -2,6 +2,7 @@ const video = document.getElementById('video');
 const canvasOutput = document.getElementById('canvas-output');
 const ctxOutput = canvasOutput.getContext('2d');
 const downloadButton = document.getElementById('downloadButton');
+const screenshotButton = document.getElementById('screenshotButton');
 
 let prevGray = null;
 let streaming = false;
@@ -43,6 +44,7 @@ const controls = {
             prevGray = gray;
 
             downloadButton.style.display = 'inline-block';
+            screenshotButton.style.display = 'inline-block';
             src.delete();
         }
     }
@@ -345,6 +347,7 @@ function updateVideoDisplay() {
         prevGray = null;
         // Hide download button since reference frame is cleared
         downloadButton.style.display = 'none';
+        screenshotButton.style.display = 'none';
     }
     
     cap = new cv.VideoCapture(video);
@@ -518,6 +521,29 @@ downloadButton.addEventListener('click', () => {
     }
 });
 
+screenshotButton.addEventListener('click', () => {
+    // Create a temporary canvas to capture the current frame
+    const screenshotCanvas = document.createElement('canvas');
+    screenshotCanvas.width = width;
+    screenshotCanvas.height = height;
+    const screenshotCtx = screenshotCanvas.getContext('2d');
+    
+    // Copy the current canvas content (which includes video + flow vectors)
+    screenshotCtx.drawImage(canvasOutput, 0, 0);
+    
+    // Convert to blob and download
+    screenshotCanvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `DIC_screenshot_${width}x${height}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 'image/png');
+});
+
 function downloadFlowData(flow) {
     const wsU = XLSX.utils.aoa_to_sheet(flow.u);
     const wsV = XLSX.utils.aoa_to_sheet(flow.v);
@@ -552,6 +578,7 @@ function processVideo() {
                 prevGray.delete();
                 prevGray = null;
                 downloadButton.style.display = 'none';
+                screenshotButton.style.display = 'none';
                 // Just draw the video without flow calculation
                 ctxOutput.drawImage(video, 0, 0, width, height);
             } else {
