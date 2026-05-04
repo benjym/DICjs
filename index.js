@@ -87,6 +87,7 @@ function onOpenCvReady() {
 
 let cameraCapabilities = null;
 let initialStream = null;
+let cameraOptions = {};
 
 function getCameras() {
     // Get selected resolution for initial request
@@ -155,19 +156,20 @@ function getCameras() {
                     changeResolution(value);
                 });
 
-            // if (videoDevices.length > 1) {
-            //     const cameraOptions = {};
-            //     videoDevices.forEach((device, index) => {
-            //         cameraOptions[`Camera ${index + 1}`] = index;
-            //     });
 
-            //     gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
-            //         .name('Camera')
-            //         .onChange(value => {
-            //             currentCameraIndex = value;
-            //             startCamera();
-            //         });
-            // }
+            //console.log(videoDevices) ;
+            {
+            videoDevices.forEach((device, index) => {
+            cameraOptions[`Camera ${index + 1}`] = index;
+            });
+
+            gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
+            .name('Camera')
+            .onChange(value => {
+                currentCameraIndex = value;
+                startCamera();
+                });
+            }
 
             // Only start camera after OpenCV is ready AND devices are enumerated
             if (cvLoaded) {
