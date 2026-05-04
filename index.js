@@ -88,6 +88,42 @@ function onOpenCvReady() {
 let cameraCapabilities = null;
 let initialStream = null;
 let cameraOptions = {};
+let orientationAngle = 0;
+
+function getDeviceOrientationAngle() {
+    let angle = 0;
+    if (screen.orientation && typeof screen.orientation.angle === 'number') {
+        angle = screen.orientation.angle;
+    } else if (typeof window.orientation === 'number') {
+        angle = window.orientation;
+    }
+    angle = ((angle % 360) + 360) % 360;
+    return [0, 90, 180, 270].includes(angle) ? angle : 0;
+}
+
+function applyOrientationRotation() {
+    orientationAngle = getDeviceOrientationAngle();
+    if (!width || !height) return;
+
+    if (orientationAngle === 90 || orientationAngle === 270) {
+        canvasOutput.width = height;
+        canvasOutput.height = width;
+    } else {
+        canvasOutput.width = width;
+        canvasOutput.height = height;
+    }
+
+    canvasOutput.style.width = '100%';
+    canvasOutput.style.height = 'auto';
+    canvasOutput.style.aspectRatio = 'auto';
+}
+
+function handleOrientationChange() {
+    const newAngle = getDeviceOrientationAngle();
+    if (newAngle === orientationAngle) return;
+    console.log('Device orientation changed to', newAngle);
+    applyOrientationRotation();
+}
 
 function getCameras() {
     // Get selected resolution for initial request
@@ -333,9 +369,10 @@ function updateVideoDisplay() {
     video.height = height;
     video.style.aspectRatio = `${width} / ${height}`;
     
-    // Update canvas dimensions
+    // Update canvas dimensions and apply orientation
     canvasOutput.width = width;
     canvasOutput.height = height;
+    applyOrientationRotation();
     
     // Reinitialize OpenCV Mats with new dimensions
     if (frame) frame.delete();
@@ -498,6 +535,7 @@ function setupVideoHandlers() {
         // canvasSource.height = height;
         canvasOutput.width = width;
         canvasOutput.height = height;
+        applyOrientationRotation();
 
         // Reinitialize Mats with correct dimensions
         if (frame) frame.delete();
@@ -526,11 +564,8 @@ downloadButton.addEventListener('click', () => {
 screenshotButton.addEventListener('click', () => {
     // Create a temporary canvas to capture the current frame
     const screenshotCanvas = document.createElement('canvas');
-    screenshotCanvas.width = width;
-    screenshotCanvas.height = height;
-    const screenshotCtx = screenshotCanvas.getContext('2d');
-    
-    // Copy the current canvas content (which includes video + flow vectors)
+    screenshotCanvas.width = canvasOutput.width;
+    screenshotCanvas.height = canvasOutput.height;
     screenshotCtx.drawImage(canvasOutput, 0, 0);
     
     // Convert to blob and download
@@ -582,7 +617,21 @@ function processVideo() {
                 downloadButton.style.display = 'none';
                 screenshotButton.style.display = 'none';
                 // Just draw the video without flow calculation
+                ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
+                ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+                ctxOutput.save();
+                if (orientationAngle === 90) {
+                    ctxOutput.translate(canvasOutput.width, 0);
+                    ctxOutput.rotate(Math.PI / 2);
+                } else if (orientationAngle === 180) {
+                    ctxOutput.translate(canvasOutput.width, canvasOutput.height);
+                    ctxOutput.rotate(Math.PI);
+                } else if (orientationAngle === 270) {
+                    ctxOutput.translate(0, canvasOutput.height);
+                    ctxOutput.rotate(-Math.PI / 2);
+                }
                 ctxOutput.drawImage(video, 0, 0, width, height);
+                ctxOutput.restore();
             } else {
                 let winSize = controls.winSize % 2 === 0 ? controls.winSize + 1 : controls.winSize;
                 cv.calcOpticalFlowFarneback(prevGray, gray, flow, 0.5, 3, winSize, 3, 5, 1.2, 0);
@@ -605,6 +654,20 @@ function processVideo() {
                 flowData = { u: uData, v: vData };
 
                 // --- Visualization ---
+                ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
+                ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+                ctxOutput.save();
+                if (orientationAngle === 90) {
+                    ctxOutput.translate(canvasOutput.width, 0);
+                    ctxOutput.rotate(Math.PI / 2);
+                } else if (orientationAngle === 180) {
+                    ctxOutput.translate(canvasOutput.width, canvasOutput.height);
+                    ctxOutput.rotate(Math.PI);
+                } else if (orientationAngle === 270) {
+                    ctxOutput.translate(0, canvasOutput.height);
+                    ctxOutput.rotate(-Math.PI / 2);
+                }
+
                 // Draw the *current* video frame onto the output canvas.
                 ctxOutput.drawImage(video, 0, 0, width, height);
                 // ctxOutput.strokeStyle = 'white';
@@ -627,9 +690,24 @@ function processVideo() {
                         ctxOutput.stroke();
                     }
                 }
+                ctxOutput.restore();
             }        } else {
             // If no prevGray, still draw the video
+            ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
+            ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+            ctxOutput.save();
+            if (orientationAngle === 90) {
+                ctxOutput.translate(canvasOutput.width, 0);
+                ctxOutput.rotate(Math.PI / 2);
+            } else if (orientationAngle === 180) {
+                ctxOutput.translate(canvasOutput.width, canvasOutput.height);
+                ctxOutput.rotate(Math.PI);
+            } else if (orientationAngle === 270) {
+                ctxOutput.translate(0, canvasOutput.height);
+                ctxOutput.rotate(-Math.PI / 2);
+            }
             ctxOutput.drawImage(video, 0, 0, width, height);
+            ctxOutput.restore();
         }
 
         if (controls.incremental) {
@@ -659,6 +737,12 @@ function stopProcessing() {
         console.log("Processing cleanup complete");
     }, 50);
 }
+
+window.addEventListener('orientationchange', handleOrientationChange);
+if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
+    screen.orientation.addEventListener('change', handleOrientationChange);
+}
+window.addEventListener('resize', handleOrientationChange);
 
 // Call getCameras on page load to populate the dropdown
 getCameras();
