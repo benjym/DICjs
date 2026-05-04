@@ -704,7 +704,7 @@ function processVideo() {
                 ctxOutput.rotate(Math.PI);
             } else if (orientationAngle === 270) {
                 ctxOutput.translate(0, canvasOutput.height);
-                ctxOutput.rotate(ath.PI / 2);
+                ctxOutput.rotate(Math.PI / 2);
             }
             ctxOutput.drawImage(video, 0, 0, width, height);
             ctxOutput.restore();
