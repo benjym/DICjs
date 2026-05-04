@@ -103,6 +103,7 @@ function getDeviceOrientationAngle() {
 
 function applyOrientationRotation() {
     orientationAngle = getDeviceOrientationAngle();
+    orientationAngle = 90 ;
     if (!width || !height) return;
 
     if (orientationAngle === 90 || orientationAngle === 270) {
@@ -620,15 +621,15 @@ function processVideo() {
                 ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
                 ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
                 ctxOutput.save();
-                if (orientationAngle === 90) {
+                if (orientationAngle === 270) {
                     ctxOutput.translate(canvasOutput.width, 0);
-                    ctxOutput.rotate(-Math.PI / 2);
+                    ctxOutput.rotate(Math.PI / 2);
                 } else if (orientationAngle === 180) {
                     ctxOutput.translate(canvasOutput.width, canvasOutput.height);
                     ctxOutput.rotate(Math.PI);
-                } else if (orientationAngle === 270) {
+                } else if (orientationAngle === 90) {
                     ctxOutput.translate(0, canvasOutput.height);
-                    ctxOutput.rotate(Math.PI / 2);
+                    ctxOutput.rotate(-Math.PI / 2);
                 }
                 ctxOutput.drawImage(video, 0, 0, width, height);
                 ctxOutput.restore();
@@ -657,15 +658,15 @@ function processVideo() {
                 ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
                 ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
                 ctxOutput.save();
-                if (orientationAngle === 90) {
+                if (orientationAngle === 270) {
                     ctxOutput.translate(canvasOutput.width, 0);
-                    ctxOutput.rotate(-Math.PI / 2);
+                    ctxOutput.rotate(Math.PI / 2);
                 } else if (orientationAngle === 180) {
                     ctxOutput.translate(canvasOutput.width, canvasOutput.height);
                     ctxOutput.rotate(Math.PI);
-                } else if (orientationAngle === 270) {
+                } else if (orientationAngle === 90) {
                     ctxOutput.translate(0, canvasOutput.height);
-                    ctxOutput.rotate(Math.PI / 2);
+                    ctxOutput.rotate(-Math.PI / 2);
                 }
 
                 // Draw the *current* video frame onto the output canvas.
@@ -696,15 +697,15 @@ function processVideo() {
             ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
             ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
             ctxOutput.save();
-            if (orientationAngle === 90) {
+            if (orientationAngle === 270) {
                 ctxOutput.translate(canvasOutput.width, 0);
-                ctxOutput.rotate(-Math.PI / 2);
+                ctxOutput.rotate(Math.PI / 2);
             } else if (orientationAngle === 180) {
                 ctxOutput.translate(canvasOutput.width, canvasOutput.height);
                 ctxOutput.rotate(Math.PI);
-            } else if (orientationAngle === 270) {
+            } else if (orientationAngle === 90) {
                 ctxOutput.translate(0, canvasOutput.height);
-                ctxOutput.rotate(Math.PI / 2);
+                ctxOutput.rotate(-Math.PI / 2);
             }
             ctxOutput.drawImage(video, 0, 0, width, height);
             ctxOutput.restore();

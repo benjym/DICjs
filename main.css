@@ -41,17 +41,14 @@ a {
     overflow: hidden; /* Ensure canvas doesn't overflow border */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     background-color: white;
-    width: 100%;
-    max-width: 100%;
 }
 
 canvas {
     max-width: 100%;
-    max-height: calc(100vh - 220px);
-    width: auto;
     height: auto;
     display: block;
     margin: 0 auto;
+    aspect-ratio: 16 / 9; /* Enforce 16:9 aspect ratio */
 }
 
 .canvas-label {
