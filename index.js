@@ -103,7 +103,6 @@ function getDeviceOrientationAngle() {
 
 function applyOrientationRotation() {
     orientationAngle = getDeviceOrientationAngle();
-    orientationAngle = 90 ;
     if (!width || !height) return;
 
     if (orientationAngle === 90 || orientationAngle === 270) {
