@@ -89,6 +89,7 @@ let cameraCapabilities = null;
 let initialStream = null;
 let cameraOptions = {};
 let orientationAngle = 0;
+let cameraFacingMode = 'environment'; // 'user' for front-facing, 'environment' for back-facing
 
 function getDeviceOrientationAngle() {
     let angle = 0;
@@ -99,6 +100,15 @@ function getDeviceOrientationAngle() {
     }
     angle = ((angle % 360) + 360) % 360;
     return [0, 90, 180, 270].includes(angle) ? angle : 0;
+}
+
+function getRotationAngle(baseAngle) {
+    // Adjust rotation angle based on camera facing
+    if (cameraFacingMode === 'user') {
+        // Front-facing camera: adjust rotation for mirror orientation
+        return (360 - baseAngle) % 360;
+    }
+    return baseAngle;
 }
 
 function applyOrientationRotation() {
@@ -123,6 +133,23 @@ function handleOrientationChange() {
     if (newAngle === orientationAngle) return;
     console.log('Device orientation changed to', newAngle);
     applyOrientationRotation();
+}
+
+function applyCanvasRotation(ctx, angle) {
+    // Apply rotation with translation based on the final display angle
+    // Account for camera facing mode when determining the rotation
+    const adjustedAngle = getRotationAngle(angle);
+    
+    if (adjustedAngle === 270) {
+        ctx.translate(canvasOutput.width, 0);
+        ctx.rotate(Math.PI / 2);
+    } else if (adjustedAngle === 180) {
+        ctx.translate(canvasOutput.width, canvasOutput.height);
+        ctx.rotate(Math.PI);
+    } else if (adjustedAngle === 90) {
+        ctx.translate(0, canvasOutput.height);
+        ctx.rotate(-Math.PI / 2);
+    }
 }
 
 function getCameras() {
@@ -154,6 +181,8 @@ function getCameras() {
             // Get the video track to check capabilities and enumerate devices
             const videoTrack = stream.getVideoTracks()[0];
             cameraCapabilities = videoTrack.getCapabilities();
+            cameraFacingMode = videoTrack.getSettings().facingMode || 'environment';
+            console.log('Camera facing mode:', cameraFacingMode);
 
             console.log("Camera capabilities:", cameraCapabilities);
             console.log("Initial stream resolution:", videoTrack.getSettings());
@@ -291,6 +320,8 @@ function changeResolution(resolutionName) {
         .then(stream => {
             console.log("Successfully got new stream with exact constraints");
             const videoTrack = stream.getVideoTracks()[0];
+            cameraFacingMode = videoTrack.getSettings().facingMode || 'environment';
+            console.log('Camera facing mode:', cameraFacingMode);
             console.log("New stream settings:", videoTrack.getSettings());
             
             // Stop the old stream
@@ -326,6 +357,8 @@ function changeResolution(resolutionName) {
             if (stream) {
                 console.log("Successfully got fallback stream with ideal constraints");
                 const videoTrack = stream.getVideoTracks()[0];
+                cameraFacingMode = videoTrack.getSettings().facingMode || 'environment';
+                console.log('Camera facing mode:', cameraFacingMode);
                 console.log("Fallback stream settings:", videoTrack.getSettings());
                 
                 // Stop the old stream
@@ -470,6 +503,9 @@ function requestNewStreamForCamera() {
             }
             video.srcObject = stream;
             video.play();
+            const videoTrack = stream.getVideoTracks()[0];
+            cameraFacingMode = videoTrack.getSettings().facingMode || 'environment';
+            console.log('Camera facing mode:', cameraFacingMode);
             setupVideoHandlers();
         })
         .catch(err => {
@@ -495,6 +531,9 @@ function requestNewStreamForCamera() {
                 }
                 video.srcObject = stream;
                 video.play();
+                const videoTrack = stream.getVideoTracks()[0];
+                cameraFacingMode = videoTrack.getSettings().facingMode || 'environment';
+                console.log('Camera facing mode:', cameraFacingMode);
                 setupVideoHandlers();
             }
         })
@@ -620,16 +659,7 @@ function processVideo() {
                 ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
                 ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
                 ctxOutput.save();
-                if (orientationAngle === 270) {
-                    ctxOutput.translate(canvasOutput.width, 0);
-                    ctxOutput.rotate(Math.PI / 2);
-                } else if (orientationAngle === 180) {
-                    ctxOutput.translate(canvasOutput.width, canvasOutput.height);
-                    ctxOutput.rotate(Math.PI);
-                } else if (orientationAngle === 90) {
-                    ctxOutput.translate(0, canvasOutput.height);
-                    ctxOutput.rotate(-Math.PI / 2);
-                }
+                applyCanvasRotation(ctxOutput, orientationAngle);
                 ctxOutput.drawImage(video, 0, 0, width, height);
                 ctxOutput.restore();
             } else {
@@ -657,16 +687,7 @@ function processVideo() {
                 ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
                 ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
                 ctxOutput.save();
-                if (orientationAngle === 270) {
-                    ctxOutput.translate(canvasOutput.width, 0);
-                    ctxOutput.rotate(Math.PI / 2);
-                } else if (orientationAngle === 180) {
-                    ctxOutput.translate(canvasOutput.width, canvasOutput.height);
-                    ctxOutput.rotate(Math.PI);
-                } else if (orientationAngle === 90) {
-                    ctxOutput.translate(0, canvasOutput.height);
-                    ctxOutput.rotate(-Math.PI / 2);
-                }
+                applyCanvasRotation(ctxOutput, orientationAngle);
 
                 // Draw the *current* video frame onto the output canvas.
                 ctxOutput.drawImage(video, 0, 0, width, height);
@@ -696,16 +717,7 @@ function processVideo() {
             ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
             ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
             ctxOutput.save();
-            if (orientationAngle === 270) {
-                ctxOutput.translate(canvasOutput.width, 0);
-                ctxOutput.rotate(Math.PI / 2);
-            } else if (orientationAngle === 180) {
-                ctxOutput.translate(canvasOutput.width, canvasOutput.height);
-                ctxOutput.rotate(Math.PI);
-            } else if (orientationAngle === 90) {
-                ctxOutput.translate(0, canvasOutput.height);
-                ctxOutput.rotate(-Math.PI / 2);
-            }
+            applyCanvasRotation(ctxOutput, orientationAngle);
             ctxOutput.drawImage(video, 0, 0, width, height);
             ctxOutput.restore();
         }
