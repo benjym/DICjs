@@ -659,13 +659,13 @@ function processVideo() {
                 ctxOutput.save();
                 if (orientationAngle === 90) {
                     ctxOutput.translate(canvasOutput.width, 0);
-                    ctxOutput.rotate(Math.PI / 2);
+                    ctxOutput.rotate(-Math.PI / 2);
                 } else if (orientationAngle === 180) {
                     ctxOutput.translate(canvasOutput.width, canvasOutput.height);
                     ctxOutput.rotate(Math.PI);
                 } else if (orientationAngle === 270) {
                     ctxOutput.translate(0, canvasOutput.height);
-                    ctxOutput.rotate(-Math.PI / 2);
+                    ctxOutput.rotate(Math.PI / 2);
                 }
 
                 // Draw the *current* video frame onto the output canvas.
@@ -698,13 +698,13 @@ function processVideo() {
             ctxOutput.save();
             if (orientationAngle === 90) {
                 ctxOutput.translate(canvasOutput.width, 0);
-                ctxOutput.rotate(Math.PI / 2);
+                ctxOutput.rotate(-Math.PI / 2);
             } else if (orientationAngle === 180) {
                 ctxOutput.translate(canvasOutput.width, canvasOutput.height);
                 ctxOutput.rotate(Math.PI);
             } else if (orientationAngle === 270) {
                 ctxOutput.translate(0, canvasOutput.height);
-                ctxOutput.rotate(-Math.PI / 2);
+                ctxOutput.rotate(ath.PI / 2);
             }
             ctxOutput.drawImage(video, 0, 0, width, height);
             ctxOutput.restore();
