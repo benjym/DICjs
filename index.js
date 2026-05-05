@@ -605,6 +605,7 @@ screenshotButton.addEventListener('click', () => {
     const screenshotCanvas = document.createElement('canvas');
     screenshotCanvas.width = canvasOutput.width;
     screenshotCanvas.height = canvasOutput.height;
+    const screenshotCtx = screenshotCanvas.getContext('2d');
     screenshotCtx.drawImage(canvasOutput, 0, 0);
     
     // Convert to blob and download
