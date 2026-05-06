@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,11 +11,13 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-GQE06JN33T"></script>
-    <link rel="stylesheet" href="main.css"></link>
+    <link rel="stylesheet" href="main.css">
+    </link>
     <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19.1/dist/lil-gui.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/opencv.js-webassembly@4.2.0/opencv.min.js" onload="onOpenCvReady()"></script>
 </head>
+
 <body>
     <h1>Digital Image Correlation</h1>
 
@@ -27,7 +30,7 @@
         <canvas id="canvas-source" style="display: none;"></canvas>
     </div>
 
-     <div id="buttons-container">
+    <div id="buttons-container">
         <button id="downloadButton" style="display: none;">Download Displacements</button>
         <button id="screenshotButton" style="display: none;">Screenshot</button>
     </div>
@@ -43,7 +46,7 @@
             <li><strong>Observe Motion:</strong> Coloured lines on the canvas show pixel movement relative to the captured frame.</li>
             <li><strong>Adjust Parameters:</strong>
                 <ul>
-                    <li><strong>Flow Density:</strong> Controls how many flow vectors are <strong>displayed</strong> (higher = more lines).  This does not affect the optical flow calculation itself, only the visualization.</li>
+                    <li><strong>Flow Density:</strong> Controls how many flow vectors are <strong>displayed</strong> (higher = more lines). This does not affect the optical flow calculation itself, only the visualization.</li>
                     <li><strong>Window Size:</strong> Adjusts the neighbourhood size for correlation calculation. Smaller is noisier but picks up finer features. Larger is smoother and more spread out.</li>
                     <li><strong>Vector Scale:</strong> Adjusts the scale of the flow vectors displayed on the canvas. Higher values make the vectors longer and more visible.</li>
                     <li><strong>Vector Colour:</strong> Adjust the colour of the flow vectors displayed on the canvas.</li>
@@ -58,6 +61,8 @@
         Built with <a href="https://threejs.org/">opencv</a> by <a href="http://benjymarks.com/">Benjy Marks</a>
     </div>
 
+    <script src="webgpu-farneback.js"></script>
     <script src="index.js"></script>
 </body>
+
 </html>

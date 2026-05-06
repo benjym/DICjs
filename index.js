@@ -9,6 +9,11 @@ let streaming = false;
 let width, height;
 let flowData = null;
 let cvLoaded = false;
+let webGpuFarneback = null;
+let webGpuFarnebackReady = false;
+
+let showWindowSizePreview = false;
+let windowSizePreviewTimeout = null;
 
 let currentCameraIndex = 0;
 let videoDevices = [];
@@ -16,12 +21,14 @@ let videoDevices = [];
 // --- GUI Controls ---
 const gui = new lil.GUI();
 const controls = {
+    // method: 'Lucas-Kanade',
+    method: 'Farneback (WebGPU)',
     flowStep: 16,
     winSize: 15,
     incremental: false,
     vectorScale: 1.0,
     resolution: '480p (640×480)',
-    arrowColour : '##000000',
+    arrowColour: '##000000',
     captureFrame: () => {
         if (streaming && cvLoaded) {
             // Create a temporary canvas to capture the current frame without displaying it
@@ -29,7 +36,7 @@ const controls = {
             tempCanvas.width = width;
             tempCanvas.height = height;
             const tempCtx = tempCanvas.getContext('2d');
-            
+
             tempCtx.drawImage(video, 0, 0, width, height);
             let imageData = tempCtx.getImageData(0, 0, width, height);
 
@@ -60,8 +67,13 @@ const resolutionPresets = {
     '480p (640×480)': { width: 640, height: 480 }
 };
 
+// gui.add(controls, 'method', ['Lucas-Kanade', 'Farneback', 'Farneback (WebGPU)']).name('Method');
 gui.add(controls, 'flowStep', 2, 64, 1).name('Flow Density');
-gui.add(controls, 'winSize', 3, 256, 2).name('Window Size');
+gui.add(controls, 'winSize', 3, 256, 2).name('Window Size').onChange(() => {
+    showWindowSizePreview = true;
+    clearTimeout(windowSizePreviewTimeout);
+    windowSizePreviewTimeout = setTimeout(() => { showWindowSizePreview = false; }, 1500);
+});
 gui.add(controls, 'vectorScale', 0.1, 5.0, 0.1).name('Vector Scale');
 gui.addColor(controls, 'arrowColour').name('Vector Colour');
 gui.add(controls, 'incremental').name('Incremental');
@@ -83,6 +95,18 @@ function onOpenCvReady() {
             startCamera();
         }
     };
+}
+
+async function initWebGpuFarneback() {
+    if (typeof WebGPUFarneback === 'undefined') return;
+    try {
+        webGpuFarneback = await WebGPUFarneback.create();
+        webGpuFarnebackReady = true;
+        console.log('WebGPU Farneback is ready.');
+    } catch (err) {
+        webGpuFarnebackReady = false;
+        console.warn('WebGPU Farneback unavailable:', err.message);
+    }
 }
 
 let cameraCapabilities = null;
@@ -139,7 +163,7 @@ function applyCanvasRotation(ctx, angle) {
     // Apply rotation with translation based on the final display angle
     // Account for camera facing mode when determining the rotation
     const adjustedAngle = getRotationAngle(angle);
-    
+
     if (adjustedAngle === 270) {
         ctx.translate(canvasOutput.width, 0);
         ctx.rotate(Math.PI / 2);
@@ -161,8 +185,8 @@ function getCameras() {
     //     targetWidth = 4096;
     //     targetHeight = 2160;
     // } else {
-        targetWidth = selectedResolution.width;
-        targetHeight = selectedResolution.height;
+    targetWidth = selectedResolution.width;
+    targetHeight = selectedResolution.height;
     // }
 
     // Request camera access with selected resolution
@@ -224,16 +248,16 @@ function getCameras() {
 
             //console.log(videoDevices) ;
             {
-            videoDevices.forEach((device, index) => {
-            cameraOptions[`Camera ${index + 1}`] = index;
-            });
-
-            gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
-            .name('Camera')
-            .onChange(value => {
-                currentCameraIndex = value;
-                startCamera();
+                videoDevices.forEach((device, index) => {
+                    cameraOptions[`Camera ${index + 1}`] = index;
                 });
+
+                gui.add({ camera: currentCameraIndex }, 'camera', cameraOptions)
+                    .name('Camera')
+                    .onChange(value => {
+                        currentCameraIndex = value;
+                        startCamera();
+                    });
             }
 
             // Only start camera after OpenCV is ready AND devices are enumerated
@@ -252,7 +276,7 @@ function changeResolution(resolutionName) {
         console.log("No video stream to change resolution on");
         return;
     }
-    
+
     // First try to change constraints on existing track
     const videoTrack = video.srcObject.getVideoTracks()[0];
     if (videoTrack) {
@@ -289,7 +313,7 @@ function changeResolution(resolutionName) {
         },
         audio: false
     };
-    
+
     // First try applying constraints to existing track
     if (videoTrack) {
         console.log("Trying to apply constraints to existing track...");
@@ -299,7 +323,7 @@ function changeResolution(resolutionName) {
         }).then(() => {
             console.log("Successfully applied constraints to existing track");
             console.log("Updated track settings:", videoTrack.getSettings());
-            
+
             // Force video element to update its dimensions
             setTimeout(() => {
                 updateVideoDisplay();
@@ -312,55 +336,18 @@ function changeResolution(resolutionName) {
     } else {
         requestNewVideoStream();
     }
-    
+
     function requestNewVideoStream() {
         console.log("Requesting stream with constraints:", constraints);
-        
+
         navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-            console.log("Successfully got new stream with exact constraints");
-            const videoTrack = stream.getVideoTracks()[0];
-            cameraFacingMode = videoTrack.getSettings().facingMode || 'environment';
-            console.log('Camera facing mode:', cameraFacingMode);
-            console.log("New stream settings:", videoTrack.getSettings());
-            
-            // Stop the old stream
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-
-            // Set new stream
-            video.srcObject = stream;
-            video.play();
-
-            // Set up handlers for new stream
-            setupVideoHandlers();
-        })
-        .catch(err => {
-            console.error("Failed with exact constraints:", err.message);
-            console.log("Trying with ideal constraints as fallback");
-            
-            // Fallback to ideal constraints
-            const fallbackConstraints = {
-                video: {
-                    deviceId: videoDevices[currentCameraIndex]?.deviceId || undefined,
-                    width: { ideal: targetWidth },
-                    height: { ideal: targetHeight },
-                    frameRate: { ideal: 30 }
-                },
-                audio: false
-            };
-            
-            return navigator.mediaDevices.getUserMedia(fallbackConstraints);
-        })
-        .then(stream => {
-            if (stream) {
-                console.log("Successfully got fallback stream with ideal constraints");
+            .then(stream => {
+                console.log("Successfully got new stream with exact constraints");
                 const videoTrack = stream.getVideoTracks()[0];
                 cameraFacingMode = videoTrack.getSettings().facingMode || 'environment';
                 console.log('Camera facing mode:', cameraFacingMode);
-                console.log("Fallback stream settings:", videoTrack.getSettings());
-                
+                console.log("New stream settings:", videoTrack.getSettings());
+
                 // Stop the old stream
                 if (video.srcObject) {
                     video.srcObject.getTracks().forEach(track => track.stop());
@@ -372,12 +359,49 @@ function changeResolution(resolutionName) {
 
                 // Set up handlers for new stream
                 setupVideoHandlers();
-            }
-        })
-        .catch(err => {
-            console.error("Failed to change resolution completely:", err.message);
-            alert("Failed to change resolution: " + err.message);
-        });
+            })
+            .catch(err => {
+                console.error("Failed with exact constraints:", err.message);
+                console.log("Trying with ideal constraints as fallback");
+
+                // Fallback to ideal constraints
+                const fallbackConstraints = {
+                    video: {
+                        deviceId: videoDevices[currentCameraIndex]?.deviceId || undefined,
+                        width: { ideal: targetWidth },
+                        height: { ideal: targetHeight },
+                        frameRate: { ideal: 30 }
+                    },
+                    audio: false
+                };
+
+                return navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            })
+            .then(stream => {
+                if (stream) {
+                    console.log("Successfully got fallback stream with ideal constraints");
+                    const videoTrack = stream.getVideoTracks()[0];
+                    cameraFacingMode = videoTrack.getSettings().facingMode || 'environment';
+                    console.log('Camera facing mode:', cameraFacingMode);
+                    console.log("Fallback stream settings:", videoTrack.getSettings());
+
+                    // Stop the old stream
+                    if (video.srcObject) {
+                        video.srcObject.getTracks().forEach(track => track.stop());
+                    }
+
+                    // Set new stream
+                    video.srcObject = stream;
+                    video.play();
+
+                    // Set up handlers for new stream
+                    setupVideoHandlers();
+                }
+            })
+            .catch(err => {
+                console.error("Failed to change resolution completely:", err.message);
+                alert("Failed to change resolution: " + err.message);
+            });
     }
 }
 
@@ -385,33 +409,33 @@ function updateVideoDisplay() {
     // Force the video element to recognize the new dimensions
     const videoTrack = video.srcObject.getVideoTracks()[0];
     const settings = videoTrack.getSettings();
-    
+
     console.log("Updating video display for resolution:", settings.width, "x", settings.height);
-    
+
     // Stop current processing first
     if (streaming) {
         stopProcessing();
     }
-    
+
     // Update global width/height variables
     width = settings.width;
     height = settings.height;
-    
+
     // Update video element dimensions
     video.width = width;
     video.height = height;
     video.style.aspectRatio = `${width} / ${height}`;
-    
+
     // Update canvas dimensions and apply orientation
     canvasOutput.width = width;
     canvasOutput.height = height;
     applyOrientationRotation();
-    
+
     // Reinitialize OpenCV Mats with new dimensions
     if (frame) frame.delete();
     if (gray) gray.delete();
     if (flow) flow.delete();
-    
+
     // Clear the reference frame since it has old dimensions
     if (prevGray) {
         console.log("Clearing reference frame due to resolution change");
@@ -421,15 +445,15 @@ function updateVideoDisplay() {
         downloadButton.style.display = 'none';
         screenshotButton.style.display = 'none';
     }
-    
+
     cap = new cv.VideoCapture(video);
     frame = new cv.Mat(height, width, cv.CV_8UC4);
     gray = new cv.Mat(height, width, cv.CV_8UC1);
     flow = new cv.Mat();
-    
+
     console.log("Updated OpenCV Mats for dimensions:", width, "x", height);
     console.log("Frame Mat size:", frame.cols, "x", frame.rows);
-    
+
     // Restart video processing
     streaming = true;
     setTimeout(processVideo, 0);
@@ -520,7 +544,7 @@ function requestNewStreamForCamera() {
                 },
                 audio: false
             };
-            
+
             return navigator.mediaDevices.getUserMedia(fallbackConstraints);
         })
         .then(stream => {
@@ -607,13 +631,13 @@ screenshotButton.addEventListener('click', () => {
     screenshotCanvas.height = canvasOutput.height;
     const screenshotCtx = screenshotCanvas.getContext('2d');
     screenshotCtx.drawImage(canvasOutput, 0, 0);
-    
+
     // Convert to blob and download
     screenshotCanvas.toBlob((blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `DIC_screenshot_${width}x${height}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.png`;
+        a.download = `DIC_screenshot_${width}x${height}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -632,7 +656,7 @@ function downloadFlowData(flow) {
 
 // --- Optical Flow Processing ---
 
-function processVideo() {
+async function processVideo() {
     if (!streaming || !cvLoaded) {
         setTimeout(processVideo, 0);
         return;
@@ -664,56 +688,176 @@ function processVideo() {
                 ctxOutput.drawImage(video, 0, 0, width, height);
                 ctxOutput.restore();
             } else {
+                const step = controls.flowStep;
                 let winSize = controls.winSize % 2 === 0 ? controls.winSize + 1 : controls.winSize;
-                cv.calcOpticalFlowFarneback(prevGray, gray, flow, 0.5, 3, winSize, 3, 5, 1.2, 0);
 
-                // --- Store Flow Data ---
-                let uData = [];
-                let vData = [];
-                for (let y = 0; y < height; y++) {
-                    let uRow = [];
-                    let vRow = [];
-                    for (let x = 0; x < width; x++) {
-                        let fx = flow.data32F[y * flow.cols * 2 + x * 2];
-                        let fy = flow.data32F[y * flow.cols * 2 + x * 2 + 1];
-                        uRow.push(fx);
-                        vRow.push(fy);
+                if (controls.method === 'Lucas-Kanade') {
+                    // --- Lucas-Kanade sparse optical flow ---
+                    const cols = Math.floor(width / step);
+                    const rows = Math.floor(height / step);
+                    const nPts = cols * rows;
+
+                    let prevPts = new cv.Mat(nPts, 1, cv.CV_32FC2);
+                    let i = 0;
+                    for (let by = 0; by < rows; by++) {
+                        for (let bx = 0; bx < cols; bx++) {
+                            prevPts.data32F[i * 2] = bx * step + step / 2;
+                            prevPts.data32F[i * 2 + 1] = by * step + step / 2;
+                            i++;
+                        }
                     }
-                    uData.push(uRow);
-                    vData.push(vRow);
-                }
-                flowData = { u: uData, v: vData };
 
-                // --- Visualization ---
-                ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
-                ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
-                ctxOutput.save();
-                applyCanvasRotation(ctxOutput, orientationAngle);
+                    let nextPts = new cv.Mat();
+                    let status = new cv.Mat();
+                    let err = new cv.Mat();
+                    const criteria = new cv.TermCriteria(
+                        cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 30, 0.01
+                    );
+                    cv.calcOpticalFlowPyrLK(
+                        prevGray, gray, prevPts, nextPts, status, err,
+                        new cv.Size(winSize, winSize), 3, criteria
+                    );
 
-                // Draw the *current* video frame onto the output canvas.
-                ctxOutput.drawImage(video, 0, 0, width, height);
-                // ctxOutput.strokeStyle = 'white';
-                ctxOutput.strokeStyle = controls.arrowColour;
-                ctxOutput.lineWidth = 2;
+                    // --- Store Flow Data ---
+                    let uData = [];
+                    let vData = [];
+                    for (let by = 0; by < rows; by++) {
+                        let uRow = [];
+                        let vRow = [];
+                        for (let bx = 0; bx < cols; bx++) {
+                            const idx = by * cols + bx;
+                            if (status.data[idx]) {
+                                uRow.push(nextPts.data32F[idx * 2] - prevPts.data32F[idx * 2]);
+                                vRow.push(nextPts.data32F[idx * 2 + 1] - prevPts.data32F[idx * 2 + 1]);
+                            } else {
+                                uRow.push(0);
+                                vRow.push(0);
+                            }
+                        }
+                        uData.push(uRow);
+                        vData.push(vRow);
+                    }
+                    flowData = { u: uData, v: vData };
 
-                // Draw the flow vectors.
-                for (let y = 0; y < height; y += controls.flowStep) {
-                    for (let x = 0; x < width; x += controls.flowStep) {
-                        let fx = flow.data32F[y * flow.cols * 2 + x * 2];
-                        let fy = flow.data32F[y * flow.cols * 2 + x * 2 + 1];
+                    // --- Visualization ---
+                    ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
+                    ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+                    ctxOutput.save();
+                    applyCanvasRotation(ctxOutput, orientationAngle);
+                    ctxOutput.drawImage(video, 0, 0, width, height);
+                    ctxOutput.strokeStyle = controls.arrowColour;
+                    ctxOutput.lineWidth = 2;
 
-                        // Apply vector scaling
-                        let scaledFx = fx * controls.vectorScale;
-                        let scaledFy = fy * controls.vectorScale;
-
+                    for (let idx = 0; idx < nPts; idx++) {
+                        if (!status.data[idx]) continue;
+                        const x0 = prevPts.data32F[idx * 2];
+                        const y0 = prevPts.data32F[idx * 2 + 1];
+                        const fx = (nextPts.data32F[idx * 2] - x0) * controls.vectorScale;
+                        const fy = (nextPts.data32F[idx * 2 + 1] - y0) * controls.vectorScale;
                         ctxOutput.beginPath();
-                        ctxOutput.moveTo(x, y);
-                        ctxOutput.lineTo(x + scaledFx, y + scaledFy);
+                        ctxOutput.moveTo(x0, y0);
+                        ctxOutput.lineTo(x0 + fx, y0 + fy);
                         ctxOutput.stroke();
                     }
+                    ctxOutput.restore();
+
+                    prevPts.delete(); nextPts.delete(); status.delete(); err.delete();
+
+                } else if (controls.method === 'Farneback (WebGPU)') {
+                    if (!webGpuFarnebackReady || !webGpuFarneback) {
+                        console.warn('WebGPU Farneback not ready, falling back to OpenCV Farneback');
+                        controls.method = 'Farneback';
+                    } else {
+                        const flowArray = await webGpuFarneback.compute(
+                            prevGray.data,
+                            gray.data,
+                            width,
+                            height,
+                            winSize
+                        );
+
+                        // --- Store Flow Data ---
+                        let uData = [];
+                        let vData = [];
+                        for (let y = 0; y < height; y++) {
+                            let uRow = [];
+                            let vRow = [];
+                            const rowStart = y * width * 2;
+                            for (let x = 0; x < width; x++) {
+                                uRow.push(flowArray[rowStart + x * 2]);
+                                vRow.push(flowArray[rowStart + x * 2 + 1]);
+                            }
+                            uData.push(uRow);
+                            vData.push(vRow);
+                        }
+                        flowData = { u: uData, v: vData };
+
+                        // --- Visualization ---
+                        ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
+                        ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+                        ctxOutput.save();
+                        applyCanvasRotation(ctxOutput, orientationAngle);
+                        ctxOutput.drawImage(video, 0, 0, width, height);
+                        ctxOutput.strokeStyle = controls.arrowColour;
+                        ctxOutput.lineWidth = 2;
+
+                        for (let y = 0; y < height; y += step) {
+                            for (let x = 0; x < width; x += step) {
+                                const idx = (y * width + x) * 2;
+                                const fx = flowArray[idx] * controls.vectorScale;
+                                const fy = flowArray[idx + 1] * controls.vectorScale;
+                                ctxOutput.beginPath();
+                                ctxOutput.moveTo(x, y);
+                                ctxOutput.lineTo(x + fx, y + fy);
+                                ctxOutput.stroke();
+                            }
+                        }
+                        ctxOutput.restore();
+                    }
                 }
-                ctxOutput.restore();
-            }        } else {
+
+                if (controls.method === 'Farneback') {
+                    // --- Farneback dense optical flow ---
+                    cv.calcOpticalFlowFarneback(prevGray, gray, flow, 0.5, 3, winSize, 3, 5, 1.2, 0);
+
+                    // --- Store Flow Data ---
+                    let uData = [];
+                    let vData = [];
+                    for (let y = 0; y < height; y++) {
+                        let uRow = [];
+                        let vRow = [];
+                        for (let x = 0; x < width; x++) {
+                            uRow.push(flow.data32F[y * flow.cols * 2 + x * 2]);
+                            vRow.push(flow.data32F[y * flow.cols * 2 + x * 2 + 1]);
+                        }
+                        uData.push(uRow);
+                        vData.push(vRow);
+                    }
+                    flowData = { u: uData, v: vData };
+
+                    // --- Visualization ---
+                    ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
+                    ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+                    ctxOutput.save();
+                    applyCanvasRotation(ctxOutput, orientationAngle);
+                    ctxOutput.drawImage(video, 0, 0, width, height);
+                    ctxOutput.strokeStyle = controls.arrowColour;
+                    ctxOutput.lineWidth = 2;
+
+                    for (let y = 0; y < height; y += step) {
+                        for (let x = 0; x < width; x += step) {
+                            const fx = flow.data32F[y * flow.cols * 2 + x * 2] * controls.vectorScale;
+                            const fy = flow.data32F[y * flow.cols * 2 + x * 2 + 1] * controls.vectorScale;
+                            ctxOutput.beginPath();
+                            ctxOutput.moveTo(x, y);
+                            ctxOutput.lineTo(x + fx, y + fy);
+                            ctxOutput.stroke();
+                        }
+                    }
+                    ctxOutput.restore();
+                }
+            }
+        } else {
             // If no prevGray, still draw the video
             ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
             ctxOutput.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
@@ -727,6 +871,8 @@ function processVideo() {
             prevGray = gray.clone(); // Clone current gray to prevGray
         }
 
+        drawWindowSizeOverlay();
+
     } catch (err) {
         console.error("Error in processVideo:", err);
 
@@ -738,6 +884,24 @@ function processVideo() {
     let delay = Math.max(0, 1000 / 30 - (Date.now() - begin));
     setTimeout(processVideo, delay);
 }
+function drawWindowSizeOverlay() {
+    if (!showWindowSizePreview || !width || !height) return;
+    const size = controls.winSize % 2 === 0 ? controls.winSize + 1 : controls.winSize;
+    const cx = Math.round(canvasOutput.width / 2);
+    const cy = Math.round(canvasOutput.height / 2);
+    ctxOutput.save();
+    ctxOutput.setTransform(1, 0, 0, 1, 0, 0);
+    ctxOutput.strokeStyle = 'rgba(255, 220, 0, 0.95)';
+    ctxOutput.lineWidth = 2;
+    ctxOutput.strokeRect(cx - size / 2, cy - size / 2, size, size);
+    ctxOutput.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctxOutput.fillRect(cx - size / 2, cy - size / 2 - 22, size < 80 ? 80 : size, 20);
+    ctxOutput.fillStyle = 'rgba(255, 220, 0, 0.95)';
+    ctxOutput.font = 'bold 13px monospace';
+    ctxOutput.fillText(`Window: ${size}×${size}px`, cx - size / 2 + 4, cy - size / 2 - 7);
+    ctxOutput.restore();
+}
+
 function stopProcessing() {
     console.log("Stopping processing, current streaming state:", streaming);
     if (streaming) {
@@ -758,4 +922,5 @@ if (screen.orientation && typeof screen.orientation.addEventListener === 'functi
 window.addEventListener('resize', handleOrientationChange);
 
 // Call getCameras on page load to populate the dropdown
+initWebGpuFarneback();
 getCameras();
