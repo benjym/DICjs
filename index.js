@@ -11,6 +11,8 @@ let flowData = null;
 let cvLoaded = false;
 let webGpuFarneback = null;
 let webGpuFarnebackReady = false;
+let clahe = null;
+let contrastGray = null;
 
 let showWindowSizePreview = false;
 let windowSizePreviewTimeout = null;
@@ -25,6 +27,7 @@ const controls = {
     method: 'Farneback (WebGPU)',
     flowStep: 16,
     winSize: 15,
+    enhanceContrast: true,
     incremental: false,
     vectorScale: 1.0,
     resolution: '480p (640×480)',
@@ -45,6 +48,13 @@ const controls = {
 
             let gray = new cv.Mat();
             cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+            if (controls.enhanceContrast && clahe) {
+                const enhanced = new cv.Mat();
+                clahe.apply(gray, enhanced);
+                gray.delete();
+                gray = enhanced;
+            }
 
             // Important: Delete the *old* prevGray before replacing it.
             if (prevGray) prevGray.delete();
@@ -76,6 +86,14 @@ gui.add(controls, 'winSize', 3, 256, 2).name('Window Size').onChange(() => {
 });
 gui.add(controls, 'vectorScale', 0.1, 5.0, 0.1).name('Vector Scale');
 gui.addColor(controls, 'arrowColour').name('Vector Colour');
+gui.add(controls, 'enhanceContrast').name('Enhance Contrast').onChange(() => {
+    if (prevGray) {
+        prevGray.delete();
+        prevGray = null;
+        downloadButton.style.display = 'none';
+        screenshotButton.style.display = 'none';
+    }
+});
 gui.add(controls, 'incremental').name('Incremental');
 gui.add(controls, 'captureFrame').name('Capture Reference Frame');
 // Resolution dropdown will be added after camera capabilities are known
@@ -89,6 +107,7 @@ let flow;       // Optical flow Mat
 function onOpenCvReady() {
     cv['onRuntimeInitialized'] = () => {
         cvLoaded = true;
+        clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
         console.log("OpenCV.js is ready.");
         // Only start camera if devices are already enumerated
         if (videoDevices.length > 0) {
@@ -434,6 +453,7 @@ function updateVideoDisplay() {
     // Reinitialize OpenCV Mats with new dimensions
     if (frame) frame.delete();
     if (gray) gray.delete();
+    if (contrastGray) contrastGray.delete();
     if (flow) flow.delete();
 
     // Clear the reference frame since it has old dimensions
@@ -449,6 +469,7 @@ function updateVideoDisplay() {
     cap = new cv.VideoCapture(video);
     frame = new cv.Mat(height, width, cv.CV_8UC4);
     gray = new cv.Mat(height, width, cv.CV_8UC1);
+    contrastGray = new cv.Mat(height, width, cv.CV_8UC1);
     flow = new cv.Mat();
 
     console.log("Updated OpenCV Mats for dimensions:", width, "x", height);
@@ -603,11 +624,13 @@ function setupVideoHandlers() {
         // Reinitialize Mats with correct dimensions
         if (frame) frame.delete();
         if (gray) gray.delete();
+        if (contrastGray) contrastGray.delete();
         if (flow) flow.delete();
 
         cap = new cv.VideoCapture(video);
         frame = new cv.Mat(height, width, cv.CV_8UC4);
         gray = new cv.Mat(height, width, cv.CV_8UC1);
+        contrastGray = new cv.Mat(height, width, cv.CV_8UC1);
         flow = new cv.Mat();
 
         console.log("OpenCV Mats initialized with dimensions:", width, "x", height);
@@ -670,11 +693,15 @@ async function processVideo() {
 
         // Convert the current frame to grayscale.
         cv.cvtColor(frame, gray, cv.COLOR_RGBA2GRAY);
+        if (controls.enhanceContrast && clahe) {
+            clahe.apply(gray, contrastGray);
+        }
+        const currentGray = controls.enhanceContrast && clahe ? contrastGray : gray;
 
         // If prevGray is not null, calculate optical flow.
         if (prevGray) {
             // Safety check: ensure prevGray and gray have the same dimensions
-            if (prevGray.rows !== gray.rows || prevGray.cols !== gray.cols) {
+            if (prevGray.rows !== currentGray.rows || prevGray.cols !== currentGray.cols) {
                 console.log("Dimension mismatch detected, clearing reference frame");
                 prevGray.delete();
                 prevGray = null;
@@ -714,7 +741,7 @@ async function processVideo() {
                         cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 30, 0.01
                     );
                     cv.calcOpticalFlowPyrLK(
-                        prevGray, gray, prevPts, nextPts, status, err,
+                        prevGray, currentGray, prevPts, nextPts, status, err,
                         new cv.Size(winSize, winSize), 3, criteria
                     );
 
@@ -770,7 +797,7 @@ async function processVideo() {
                     } else {
                         const flowArray = await webGpuFarneback.compute(
                             prevGray.data,
-                            gray.data,
+                            currentGray.data,
                             width,
                             height,
                             winSize
@@ -818,7 +845,7 @@ async function processVideo() {
 
                 if (controls.method === 'Farneback') {
                     // --- Farneback dense optical flow ---
-                    cv.calcOpticalFlowFarneback(prevGray, gray, flow, 0.5, 3, winSize, 3, 5, 1.2, 0);
+                    cv.calcOpticalFlowFarneback(prevGray, currentGray, flow, 0.5, 3, winSize, 3, 5, 1.2, 0);
 
                     // --- Store Flow Data ---
                     let uData = [];
@@ -868,7 +895,8 @@ async function processVideo() {
         }
 
         if (controls.incremental) {
-            prevGray = gray.clone(); // Clone current gray to prevGray
+            if (prevGray) prevGray.delete();
+            prevGray = currentGray.clone(); // Clone current gray to prevGray
         }
 
         drawWindowSizeOverlay();
